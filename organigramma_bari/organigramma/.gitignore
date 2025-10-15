@@ -1,0 +1,39 @@
+# ---- Python / Django
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.build/
+
+# ---- Virtualenv
+venv/
+.env/
+.venv/
+
+# ---- IDE / editor
+.vscode/
+.idea/
+*.code-workspace
+
+# ---- Django stuff
+db.sqlite3
+media/
+staticfiles/
+static-root/
+.collected-static/
+
+# ---- Logs & runtime
+*.log
+logs/
+tmp/
+*.pid
+
+# ---- OS
+.DS_Store
+Thumbs.db
+
+# ---- Node (se presente)
+node_modules/
