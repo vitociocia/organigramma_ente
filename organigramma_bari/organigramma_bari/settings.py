@@ -9,8 +9,15 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
-
+import os
+from dotenv import load_dotenv
 from pathlib import Path
+
+#carico da eventuale file .env presente nella stessa directory del settings.py le variabili di ambiente
+dotenv_path = Path(__file__).resolve().parent.joinpath('.env')
+print("cerco .env in :" + str(dotenv_path))
+load_dotenv(dotenv_path=dotenv_path, verbose=True,override=True)
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,13 +27,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure--bwlk2lp-atppl^-lmalg)@7ozi)g=q&wxar007)3-ya1i=h3t')
 SECRET_KEY = 'django-insecure--bwlk2lp-atppl^-lmalg)@7ozi)g=q&wxar007)3-ya1i=h3t'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+if os.environ.get('DJANGO_DEBUG','True') == 'False':
+    DEBUG=False
 
-ALLOWED_HOSTS = ['127.0.0.1', '.pythonanywhere.com']
 
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS','127.0.0.1').split(',')
 
 # Application definition
 
@@ -132,3 +143,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # settings.py
 LOGIN_REDIRECT_URL = '/dashboard/'
+EMAIL_FROM_VALUE=os.environ.get('EMAIL_FROM_VALUE','test@test.it')
+DEFAULT_FROM_EMAIL=os.environ.get('DEFAULT_FROM_EMAIL','test@test.it')
+DOMAIN=os.environ.get('DOMAIN','http://site.test.it')
+SITE_ID = 1
+
+CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS','http://site.test.it').split(',')

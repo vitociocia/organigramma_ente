@@ -1,15 +1,13 @@
-# --- Core framework (coerente con il tuo progetto) ---
+asgiref==3.10.0
+design-django-theme==2.15.2
 Django==3.2.18
-
-# --- Export Excel ---
-openpyxl==3.1.5
-
-# --- Application server per produzione (WSGI) ---
+django-sass-processor==1.4.2
+django-widget-tweaks==1.5.0
+et_xmlfile==2.0.0
 gunicorn==21.2.0
-
-# --- Static files in produzione (opzionale, richiede configurazione in settings) ---
+openpyxl==3.1.5
+packaging==25.0
+python-dotenv==1.0.1
+pytz==2025.2
+sqlparse==0.5.3
 whitenoise==6.6.0
-
-# --- Opzionali (decommenta SOLO se cambi DB) ---
-# psycopg2-binary==2.9.9    # PostgreSQL
-# mysqlclient==2.2.4         # MySQL/MariaDB (richiede librerie di sistema)
