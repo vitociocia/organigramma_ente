@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block extra_head %}
+{% endblock extra_head %}
+{% block header_center_right_zone %}
+{% endblock header_center_right_zone %}
+{% block first_column %}
+{% endblock first_column %}
+{% block second_column %}
+{% endblock second_column %}
+{% block third_column %}
+{% endblock third_column %}
+{% block fourth_column %}
+{% endblock fourth_column %}
+{% block footer_contacts_section %}
+{% endblock footer_contacts_section %}
+{% block container %}
+<h2>Dashboard Gestione</h2>
+<ul>
+    <li><a href="{% url 'struttura_list' %}">Gestisci Strutture</a></li>
+    <li><a href="{% url 'responsabile_list' %}">Gestisci Responsabili</a></li>
+    <li><a href="{% url 'qualifica_list' %}">Gestisci Qualifiche</a></li>
+</ul>
+{% endblock %}

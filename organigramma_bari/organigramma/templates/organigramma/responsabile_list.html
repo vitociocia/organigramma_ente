@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block container %}
+<div class="container my-4">
+  <div class="col-md-10 offset-md-1">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+      <h2 class="mb-0">Gestione Responsabili</h2>
+
+      <form method="get" class="d-flex align-items-center gap-2">
+        <input type="text"
+               name="q"
+               value="{{ q }}"
+               class="form-control"
+               placeholder="Cerca per nome o cognome"
+               style="min-width: 260px;">
+        {% if q %}
+          <a class="btn btn-outline-secondary" href="{% url 'responsabile_list' %}">Reset</a>
+        {% endif %}
+        <button type="submit" class="btn btn-outline-primary">Cerca</button>
+      </form>
+
+      <a href="{% url 'responsabile_create' %}" class="btn btn-primary">Aggiungi</a>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div class="text-muted small">
+        {% if page_obj %}
+          Risultati: {{ page_obj.paginator.count }}{% if q %} per <em>"{{ q }}"</em>{% endif %}
+        {% else %}
+          Risultati: {{ responsabili|length }}
+        {% endif %}
+      </div>
+      {% if page_obj %}
+        <div class="text-muted small">
+          Pagina {{ page_obj.number }} di {{ page_obj.paginator.num_pages }}
+        </div>
+      {% endif %}
+    </div>
+
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nome</th>
+          <th>Cognome</th>
+          <th>Qualifica</th>
+          <th>In carica</th>
+          <th>Periodo</th>
+          <th class="text-end">Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for responsabile in responsabili %}
+        <tr>
+          <td>{{ responsabile.id }}</td>
+          <td>{{ responsabile.nome }}</td>
+          <td>{{ responsabile.cognome }}</td>
+          <td>{{ responsabile.qualifica }}</td>
+          <td>
+            {% if responsabile.in_carica %}
+              <span class="badge bg-success">Sì</span>
+            {% else %}
+              <span class="badge bg-secondary">No</span>
+            {% endif %}
+          </td>
+          <td>
+            {{ responsabile.data_inizio|date:"d/m/Y" }}
+            –
+            {% if responsabile.data_fine %}
+              {{ responsabile.data_fine|date:"d/m/Y" }}
+            {% else %}
+              <span class="text-muted">in corso</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <a href="{% url 'responsabile_update' responsabile.id %}" class="btn btn-sm btn-warning">Modifica</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center text-muted">
+            Nessun responsabile trovato{% if q %} per <em>"{{ q }}"</em>{% endif %}.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if is_paginated %}
+    <nav aria-label="Paginazione">
+      <ul class="pagination justify-content-center">
+
+        {# Prima / Precedente #}
+        <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+          <a class="page-link"
+             href="{% if page_obj.has_previous %}?page=1{% if q %}&q={{ q|urlencode }}{% endif %}{% else %}#{% endif %}"
+             aria-disabled="{% if page_obj.has_previous %}false{% else %}true{% endif %}">« Prima</a>
+        </li>
+        <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+          <a class="page-link"
+             href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}{% else %}#{% endif %}"
+             aria-disabled="{% if page_obj.has_previous %}false{% else %}true{% endif %}">‹ Precedente</a>
+        </li>
+
+        {# Pagine centrali (range corto) #}
+        {% with start=page_obj.number|add:"-2" end=page_obj.number|add:"2" %}
+          {% for num in page_obj.paginator.page_range %}
+            {% if num >= start and num <= end %}
+              <li class="page-item {% if num == page_obj.number %}active{% endif %}">
+                <a class="page-link"
+                   href="?page={{ num }}{% if q %}&q={{ q|urlencode }}{% endif %}">{{ num }}</a>
+              </li>
+            {% endif %}
+          {% endfor %}
+        {% endwith %}
+
+        {# Successiva / Ultima #}
+        <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+          <a class="page-link"
+             href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}{% else %}#{% endif %}"
+             aria-disabled="{% if page_obj.has_next %}false{% else %}true{% endif %}">Successiva ›</a>
+        </li>
+        <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+          <a class="page-link"
+             href="{% if page_obj.has_next %}?page={{ page_obj.paginator.num_pages }}{% if q %}&q={{ q|urlencode }}{% endif %}{% else %}#{% endif %}"
+             aria-disabled="{% if page_obj.has_next %}false{% else %}true{% endif %}">Ultima »</a>
+        </li>
+
+      </ul>
+    </nav>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<style>
+:root{
+  --h-gap: 36px;   /* distanza orizzontale padre → colonna figli */
+  --v-gap: 24px;   /* distanza verticale fra fratelli */
+}
+
+/* Radici in verticale; ogni radice espande a destra */
+.tree{
+  position: relative;     /* ancora l'SVG overlay */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 28px;
+  padding: 8px 8px 12px;
+  overflow: auto;         /* per la UX; in PDF usiamo una copia off-screen */
+}
+
+/* Overlay per i collegamenti (sotto i box) */
+#links-layer{
+  position: absolute; left: 0; top: 0;
+  pointer-events: none; z-index: 0;
+}
+
+/* Nodo: box a sinistra, figli a destra in colonna */
+.tree-node{
+  display: flex; flex-direction: row; align-items: center; position: relative;
+}
+
+/* Box grafico */
+.box{
+  background:#fff; border:2px solid #000; border-radius:6px;
+  padding:12px 18px; min-width:260px; text-align:center; position:relative; z-index:1;
+}
+.box-title{ font-weight:700; color:#000; font-size:16px; }
+.box-detail{ font-size:13px; color:#444; }
+
+/* Colonna dei figli: vertical stack */
+.children-container{
+  display:flex; flex-direction: column; gap: var(--v-gap);
+  margin-left: var(--h-gap);
+}
+
+/* Utility */
+.d-none{ display:none !important; }
+.toolbar{ display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
+
+/* link nel titolo (nome cliccabile) */
+.box-title a{ color: inherit; text-decoration: none; border-bottom: 1px dashed #000; }
+.box-title a:hover{ text-decoration: underline; }
+</style>
+{% endblock %}
+
+{% block container %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="mb-0">Organigramma</h2>
+    {% if on_date %}<small class="text-muted">Data di riferimento: {{ on_date }}</small>{% endif %}
+  </div>
+
+  <div class="alert alert-info">
+    Vengono visualizzate solo le strutture <strong>attive</strong> alla data selezionata.
+  </div>
+
+  <div class="toolbar mb-3">
+    <form method="get" class="d-flex align-items-center gap-2">
+      <label class="form-label mb-0">Data:</label>
+      <input type="date" name="on" class="form-control" style="max-width:200px" value="{{ on_date }}">
+      <button type="submit" class="btn btn-outline-primary">Aggiorna</button>
+    </form>
+
+    <a href="{% url 'export_csv' %}?on={{ on_date }}" class="btn btn-primary">Scarica CSV</a>
+    <a href="{% url 'export_excel' %}?on={{ on_date }}" class="btn btn-success">Scarica Excel</a>
+
+    <button id="export-pdf" class="btn btn-danger">Esporta PDF</button>
+    <button id="expand-all" class="btn btn-outline-success">Espandi tutte</button>
+    <button id="collapse-all" class="btn btn-outline-secondary">Collassa tutte</button>
+  </div>
+
+  <div class="tree" id="tree-container">
+    <!-- overlay per i collegamenti -->
+    <svg id="links-layer"></svg>
+
+    {% for struttura in data %}
+      {% include "organigramma/struttura_tree.html" with struttura=struttura %}
+    {% empty %}
+      <div class="alert alert-warning">Nessuna struttura attiva alla data selezionata.</div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const tree = document.getElementById('tree-container');
+  const svg  = document.getElementById('links-layer');
+
+  function drawLinks(){
+    const w = Math.max(tree.scrollWidth, tree.clientWidth);
+    const h = Math.max(tree.scrollHeight, tree.clientHeight);
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    const rectTree = tree.getBoundingClientRect();
+
+    tree.querySelectorAll('.tree-node').forEach(node => {
+      const box = node.querySelector(':scope > .box');
+      const childrenCol = node.querySelector(':scope > .children-container');
+      if (!box || !childrenCol || childrenCol.classList.contains('d-none')) return;
+
+      const rectP = box.getBoundingClientRect();
+      const x1 = rectP.right  - rectTree.left + tree.scrollLeft;
+      const y1 = rectP.top    - rectTree.top  + tree.scrollTop + rectP.height/2;
+
+      childrenCol.querySelectorAll(':scope > .tree-node').forEach(ch => {
+        if (ch.offsetParent === null) return;
+        const childBox = ch.querySelector(':scope > .box') || ch;
+        const rectC = childBox.getBoundingClientRect();
+        const x2 = rectC.left  - rectTree.left + tree.scrollLeft;
+        const y2 = rectC.top   - rectTree.top  + tree.scrollTop + rectC.height/2;
+        const dx = Math.max(30, (x2 - x1) / 2);
+        const d  = `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', d);
+        path.setAttribute('stroke', '#000');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('fill', 'none');
+        svg.appendChild(path);
+      });
+    });
+  }
+
+  /* ============== EXPORT PDF: copia off-screen, espande tutto, ridisegna link ============== */
+  document.getElementById('export-pdf').addEventListener('click', async function () {
+    const source = document.getElementById('tree-container');
+    if (!source) return;
+
+    // 1) Clona off-screen (non tocca la vista)
+    const clone = source.cloneNode(true);
+    clone.id = 'tree-container-pdf-' + Date.now();
+    const PAD = 140; // bordo di sicurezza per evitare tagli
+    Object.assign(clone.style, {
+      position: 'absolute',
+      left: '-100000px',
+      top: '0',
+      overflow: 'visible',
+      padding: PAD + 'px',
+      visibility: 'visible',
+      background: '#ffffff'
+    });
+    document.body.appendChild(clone);
+
+    // 2) Espandi TUTTE le sottostrutture nella copia
+    clone.querySelectorAll('.children-container').forEach(el => el.classList.remove('d-none'));
+    clone.querySelectorAll('.tree-node.has-children').forEach(n => n.classList.remove('collapsed'));
+
+    // 3) Attendi che font/immagini siano pronte per avere misure stabili
+    if (document.fonts && document.fonts.ready) {
+      try { await document.fonts.ready; } catch(e) {}
+    }
+    await new Promise(requestAnimationFrame);
+
+    // 4) Ridisegna i collegamenti SOLO nella copia
+    (function drawLinksIn(rootEl){
+      const svgEl = rootEl.querySelector('#links-layer');
+      if (!svgEl) return;
+
+      const w = Math.max(rootEl.scrollWidth, rootEl.clientWidth);
+      const h = Math.max(rootEl.scrollHeight, rootEl.clientHeight);
+      svgEl.setAttribute('width', w);
+      svgEl.setAttribute('height', h);
+      while (svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
+
+      const rectRoot = rootEl.getBoundingClientRect();
+
+      rootEl.querySelectorAll('.tree-node').forEach(node => {
+        const box = node.querySelector(':scope > .box');
+        const childrenCol = node.querySelector(':scope > .children-container');
+        if (!box || !childrenCol) return;
+
+        const rectP = box.getBoundingClientRect();
+        const x1 = rectP.right  - rectRoot.left + rootEl.scrollLeft;
+        const y1 = rectP.top    - rectRoot.top  + rootEl.scrollTop + rectP.height/2;
+
+        childrenCol.querySelectorAll(':scope > .tree-node').forEach(ch => {
+          const childBox = ch.querySelector(':scope > .box') || ch;
+          const rectC = childBox.getBoundingClientRect();
+          const x2 = rectC.left  - rectRoot.left + rootEl.scrollLeft;
+          const y2 = rectC.top   - rectRoot.top  + rootEl.scrollTop + rectC.height/2;
+
+          const dx = Math.max(30, (x2 - x1) / 2);
+          const d  = `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', d);
+          path.setAttribute('stroke', '#000');
+          path.setAttribute('stroke-width', '2');
+          path.setAttribute('fill', 'none');
+          svgEl.appendChild(path);
+        });
+      });
+    })(clone);
+
+    // 5) Misura la copia ed esporta (pagina = contenuto, landscape)
+    const w = Math.max(clone.scrollWidth, clone.clientWidth);
+    const h = Math.max(clone.scrollHeight, clone.clientHeight);
+    clone.style.width  = w + 'px';
+    clone.style.height = h + 'px';
+
+    const opt = {
+      margin: 0,
+      filename: 'organigramma.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        background: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        scrollX: 0, scrollY: 0,
+        width: w, height: h,
+        windowWidth: w, windowHeight: h
+      },
+      jsPDF: { unit: 'px', format: [w, h], orientation: 'landscape' }
+    };
+
+    try {
+      await html2pdf().set(opt).from(clone).save();
+    } finally {
+      clone.remove(); // pulizia
+    }
+  });
+
+  // ---------- ESPANDI / COLLASSA GLOBALI ----------
+  document.getElementById('expand-all').addEventListener('click', function () {
+    tree.querySelectorAll('.children-container').forEach(el => el.classList.remove('d-none'));
+    tree.querySelectorAll('.toggle-children').forEach(btn => btn.innerHTML = 'Nascondi sottostrutture ⬆️');
+    drawLinks();
+  });
+
+  document.getElementById('collapse-all').addEventListener('click', function () {
+    tree.querySelectorAll('.children-container').forEach(el => el.classList.add('d-none'));
+    tree.querySelectorAll('.toggle-children').forEach(btn => btn.innerHTML = 'Mostra sottostrutture ⬇️');
+    drawLinks();
+  });
+
+  // ---------- Toggle singolo ----------
+  document.querySelectorAll('#tree-container .toggle-children').forEach(button => {
+    button.addEventListener('click', function (e) {
+      e.stopPropagation();
+      const node = this.closest('.tree-node');
+      const children = node.querySelector(':scope > .children-container');
+      if (children) {
+        const hidden = children.classList.toggle('d-none');
+        this.innerHTML = hidden ? 'Mostra sottostrutture ⬇️' : 'Nascondi sottostrutture ⬆️';
+        drawLinks();
+      }
+    });
+  });
+
+  // ridisegna all'avvio e su ogni resize/scroll (per allineare l'overlay)
+  window.addEventListener('load', drawLinks);
+  window.addEventListener('resize', drawLinks);
+  tree.addEventListener('scroll', drawLinks);
+
+  // se disponibile, osserva cambi dimensioni del contenuto (ridisegna link)
+  if ('ResizeObserver' in window) {
+    const ro = new ResizeObserver(() => drawLinks());
+    ro.observe(tree);
+  }
+
+  drawLinks();
+});
+</script>
+{% endblock %}

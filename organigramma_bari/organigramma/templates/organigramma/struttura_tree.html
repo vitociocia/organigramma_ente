@@ -1,0 +1,44 @@
+{# organigramma/struttura_tree.html #}
+{# Calcolo classi layout per questo nodo #}
+{% with node_classes="" %}
+  {# Direzione Generale: ordine = 6 → figli SOTTO in colonna e con più spazio #}
+  {% if struttura.livello_ordine == 6 %}
+    {% with node_classes=node_classes|add:" below-children" %}
+    {% endwith %}
+  {% endif %}
+
+  {# Dal Primo Livello in giù: ordine >= 7 → figli SOTTO in riga (orizzontale) #}
+  {% if struttura.livello_ordine and struttura.livello_ordine >= 7 %}
+    {% with node_classes=node_classes|add:" row-below" %}
+    {% endwith %}
+  {% endif %}
+
+  <div class="tree-node{{ node_classes }}">
+    <div class="box">
+      <div class="box-title">
+        {{ struttura.nome }}
+      </div>
+      <div class="box-detail">
+        {% if struttura.responsabile_nome or struttura.responsabile_cognome %}
+          Responsabile: {{ struttura.responsabile_nome }} {{ struttura.responsabile_cognome }}{% if struttura.qualifica %} · Livello {{ struttura.livello }}{% endif %}
+        {% else %}
+          Responsabile: — · Livello {{ struttura.livello }}
+        {% endif %}
+      </div>
+
+      {% if struttura.children %}
+        <button type="button" class="btn btn-outline-primary btn-sm mt-2 toggle-children">
+          Nascondi sottostrutture ⬆️
+        </button>
+      {% endif %}
+    </div>
+
+    {% if struttura.children %}
+      <div class="children-container">
+        {% for child in struttura.children %}
+          {% include "organigramma/struttura_tree.html" with struttura=child on_date=on_date only %}
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+{% endwith %}

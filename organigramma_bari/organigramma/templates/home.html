@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Comune di Bari – Organigramma{% endblock %}
+
+{% block container %}
+<div class="container my-5" style="max-width: 920px">
+  <div class="bg-light p-4 p-md-5 rounded-3 border">
+    <h1 class="mb-3">Organigramma – Comune di Bari</h1>
+    <p class="lead mb-4">
+      Consulta la struttura organizzativa dell’Ente. Puoi accedere per gestire dati e visualizzare
+      le funzionalità riservate.
+    </p>
+
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      <a class="btn btn-primary" href="{% url 'login' %}">Accedi</a>
+      <a class="btn btn-outline-primary" href="{% url 'visualizza_organigramma' %}">
+        Visualizza organigramma
+      </a>
+    </div>
+
+    <p class="text-muted mb-0">
+      Hai dimenticato la password? Scrivi a
+      <a href="mailto:v.ciocia@comune.bari.it">v.ciocia@comune.bari.it</a>.
+    </p>
+  </div>
+
+  <div class="row g-3 mt-4">
+    <div class="col-md-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title mb-2">Cosa troverai</h5>
+          <p class="card-text mb-0">Strutture, responsabili, qualifiche e l’albero gerarchico aggiornato.</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title mb-2">Accesso riservato</h5>
+          <p class="card-text mb-0">Gli utenti abilitati possono inserire e aggiornare i dati.</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title mb-2">Supporto</h5>
+          <p class="card-text mb-0">Per problemi di accesso contatta
+            <a href="mailto:v.ciocia@comune.bari.it">v.ciocia@comune.bari.it</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

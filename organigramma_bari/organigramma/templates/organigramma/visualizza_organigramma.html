@@ -1,0 +1,380 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<!-- librerie per export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --h-gap: 52px;   /* distanza orizzontale padre → figli */
+  --v-gap: 36px;   /* distanza verticale fra blocchi */
+}
+/* --- header compatto: titolo + card data affiancati --- */
+.header-line{
+  display:flex; align-items:center; justify-content:space-between;
+  gap: 16px;
+}
+
+.header-left{
+  display:flex; align-items:center; gap:16px;
+}
+
+/* card data più larga, bassa, grigio chiaro */
+#date-card{
+  display:flex; align-items:center; gap:.75rem;
+  padding:.5rem .75rem;
+  background:#f6f7f9;               /* sfondo grigio chiaro */
+  border:1px solid #dee2e6;          /* bordo visibile */
+  border-radius:.5rem;
+  min-width:560px;                   /* allarga la card */
+}
+
+#date-card .form-label{ margin:0; font-size:.9rem; white-space:nowrap; }
+
+#date-card input[type="date"]{
+  width: 260px;                      /* input più largo */
+  height: 38px;
+  padding:.25rem .5rem;
+}
+
+#date-card .btn{
+  height: 38px;                      /* allineato all’input */
+  white-space:nowrap;
+}
+
+/* --- tutti i pulsanti con bordo visibile --- */
+.toolbar .btn,
+#date-card .btn{
+  border-width:1px !important;
+  border-style:solid !important;
+}
+
+/* varianti piene: bordo in tinta (più scuro per visibilità) */
+.btn-primary{  border-color:#084298 !important; }   /* blu scuro */
+.btn-success{  border-color:#0f5132 !important; }   /* verde scuro */
+.btn-danger{   border-color:#842029 !important; }   /* rosso scuro */
+.btn-secondary{border-color:#6c757d !important; }   /* grigio */
+
+/* un filo di contrasto interno (discreto) sui pieni */
+.btn-primary, .btn-success, .btn-danger, .btn-secondary{
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.06);
+}
+
+/* pulsanti della toolbar su una riga ben allineata sotto l'header */
+.toolbar{
+  display:flex; flex-wrap:wrap; align-items:center; gap:.5rem;
+}
+
+/* header */
+.header-left{ display:flex; align-items:center; gap:12px; }
+#date-card{ display:flex; align-items:center; gap:.5rem; padding:.5rem .75rem; }
+#date-card .form-label{ margin-bottom:0; font-size:.9rem; white-space:nowrap; }
+#date-card input[type="date"]{ width: 190px; }
+
+/* toolbar azioni (sotto) */
+.toolbar{ display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
+
+/* contenitore albero */
+.tree{
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 28px;
+  padding: 8px 8px 12px;
+  overflow: visible;     /* niente scrollbar interne */
+  background: #fff;
+}
+
+/* layer connettori */
+#links-layer{ position:absolute; left:0; top:0; pointer-events:none; z-index:0; }
+
+/* nodo e box */
+.tree-node{ display:flex; flex-direction:row; align-items:center; position:relative; }
+.box{
+  background:#fff; border:2px solid #000; border-radius:6px;
+  padding:12px 18px; min-width:260px; text-align:center; position:relative; z-index:1;
+}
+.box-title{ font-weight:700; color:#000; font-size:16px; }
+.box-title a{ color:inherit; text-decoration:none; border-bottom:1px dashed #000; }
+.box-title a:hover{ text-decoration:underline; }
+.box-detail{ font-size:13px; color:#444; }
+
+/* default: figli a DESTRA in colonna (verticale) */
+.children-container{
+  display:flex;
+  flex-direction: column;
+  gap: var(--v-gap);
+  margin-left: var(--h-gap);
+}
+
+/* Direzione Generale (livello_ordine == 6) → figli SOTTO in colonna con più aria */
+.below-children > .children-container{
+  flex-direction: column;
+  margin-left: 0;
+  margin-top: calc(var(--v-gap) * 2.25); /* più spazio sotto DG */
+  gap: calc(var(--v-gap) * 1.75);        /* più spazio tra i 1° livello impilati */
+}
+
+/* Dal Primo Livello in giù (livello_ordine >= 7):
+   figli SOTTO in riga, con più distacco dal padre e più spazio tra fratelli */
+.row-below > .children-container{
+  flex-direction: row;
+  margin-left: 0;
+  margin-top: calc(var(--v-gap) * 2.0);  /* distacco dal padre (1°→2°/3°) */
+  gap: calc(var(--h-gap) * 1.5);         /* spazio orizzontale fra fratelli */
+}
+
+.d-none{ display:none !important; }
+</style>
+{% endblock %}
+
+{% block container %}
+<div class="container mt-4">
+
+  <!-- HEADER: titolo + card data affiancati -->
+  <div class="header-line mb-3">
+    <div class="header-left">
+      <h2 class="mb-0">Organigramma</h2>
+
+      <form id="date-card" method="get">
+        <label class="form-label mb-0">Data:</label>
+        <input type="date" name="on" class="form-control" value="{{ on_date }}">
+        <button type="submit" class="btn btn-primary">Aggiorna</button>
+      </form>
+    </div>
+
+    {% if on_date %}
+      <small class="text-muted">Data di riferimento: {{ on_date }}</small>
+    {% endif %}
+  </div>
+
+  <!-- TOOLBAR: tutti i pulsanti azione sotto, ben allineati -->
+  <div class="toolbar mb-3">
+    <a href="{% url 'export_csv' %}?on={{ on_date }}" class="btn btn-primary">Scarica CSV</a>
+    <a href="{% url 'export_excel' %}?on={{ on_date }}" class="btn btn-success">Scarica Excel</a>
+    <button id="export-svg" class="btn btn-outline-dark">Esporta SVG</button>
+    <button id="export-pdf" class="btn btn-danger">Esporta PDF (multi-pagina)</button>
+    <button id="expand-all" class="btn btn-outline-success">Espandi tutte</button>
+    <button id="collapse-all" class="btn btn-outline-secondary">Collassa tutte</button>
+  </div>
+
+  <!-- (il resto della pagina resta invariato) -->
+  <div class="tree" id="tree-container">
+    <svg id="links-layer"></svg>
+    {% if data %}
+      {% for struttura in data %}
+        {% include "organigramma/struttura_tree.html" with struttura=struttura on_date=on_date depth=0 only %}
+      {% empty %}
+        <div class="alert alert-warning mb-0">Nessuna struttura attiva alla data selezionata.</div>
+      {% endfor %}
+    {% else %}
+      <div class="alert alert-warning mb-0">Nessuna struttura attiva alla data selezionata.</div>
+    {% endif %}
+  </div>
+</div>
+
+
+<script>
+/* === il tuo JS esistente rimane invariato sotto questo commento === */
+document.addEventListener('DOMContentLoaded', function () {
+  const tree = document.getElementById('tree-container');
+  const svg  = document.getElementById('links-layer');
+
+  function drawLinks(){
+    const w = Math.max(tree.scrollWidth, tree.clientWidth);
+    const h = Math.max(tree.scrollHeight, tree.clientHeight);
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    const rectTree = tree.getBoundingClientRect();
+
+    tree.querySelectorAll('.tree-node').forEach(node => {
+      const box = node.querySelector(':scope > .box');
+      const childrenCol = node.querySelector(':scope > .children-container');
+      if (!box || !childrenCol || childrenCol.classList.contains('d-none')) return;
+
+      const rectP = box.getBoundingClientRect();
+      const x1 = rectP.right  - rectTree.left;
+      const y1 = rectP.top    - rectTree.top  + rectP.height/2;
+
+      childrenCol.querySelectorAll(':scope > .tree-node').forEach(ch => {
+        if (ch.offsetParent === null) return;
+        const childBox = ch.querySelector(':scope > .box') || ch;
+        const rectC = childBox.getBoundingClientRect();
+        const x2 = rectC.left  - rectTree.left;
+        const y2 = rectC.top   - rectTree.top  + rectC.height/2;
+        const dx = Math.max(30, (x2 - x1) / 2);
+        const d  = `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', d);
+        path.setAttribute('stroke', '#000');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('fill', 'none');
+        svg.appendChild(path);
+      });
+    });
+  }
+
+  document.getElementById('expand-all').addEventListener('click', function () {
+    tree.querySelectorAll('.children-container').forEach(el => el.classList.remove('d-none'));
+    tree.querySelectorAll('.toggle-children').forEach(btn => btn.innerHTML = 'Nascondi sottostrutture ⬆️');
+    drawLinks();
+  });
+  document.getElementById('collapse-all').addEventListener('click', function () {
+    tree.querySelectorAll('.children-container').forEach(el => el.classList.add('d-none'));
+    tree.querySelectorAll('.toggle-children').forEach(btn => btn.innerHTML = 'Mostra sottostrutture ⬇️');
+    drawLinks();
+  });
+  tree.addEventListener('click', function(e){
+    const btn = e.target.closest('.toggle-children');
+    if (!btn) return;
+    const node = btn.closest('.tree-node');
+    const children = node.querySelector(':scope > .children-container');
+    if (children){
+      const hidden = children.classList.toggle('d-none');
+      btn.innerHTML = hidden ? 'Mostra sottostrutture ⬇️' : 'Nascondi sottostrutture ⬆️';
+      drawLinks();
+    }
+  });
+
+  /* === export SVG / PDF + helpers… (tuo codice esistente) === */
+  const EXTRA_RIGHT = 220;
+  const EXTRA_BOTTOM = 40;
+
+  function buildPrintableClone(){
+    const source = document.getElementById('tree-container');
+    const clone = source.cloneNode(true);
+    clone.id = 'tree-container-print-' + Date.now();
+    Object.assign(clone.style, {
+      position:'absolute', left:'-100000px', top:'0',
+      overflow:'visible', padding:'80px', background:'#ffffff'
+    });
+    clone.querySelectorAll('.toggle-children').forEach(el => el.remove());
+    clone.querySelectorAll('.children-container').forEach(el => el.classList.remove('d-none'));
+    document.body.appendChild(clone);
+
+    (function drawLinksIn(rootEl){
+      const svgEl = rootEl.querySelector('#links-layer');
+      const w = Math.max(rootEl.scrollWidth, rootEl.clientWidth) + EXTRA_RIGHT;
+      const h = Math.max(rootEl.scrollHeight, rootEl.clientHeight) + EXTRA_BOTTOM;
+      svgEl.setAttribute('width', w);
+      svgEl.setAttribute('height', h);
+      while (svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
+      const rectRoot = rootEl.getBoundingClientRect();
+      rootEl.querySelectorAll('.tree-node').forEach(node => {
+        const box = node.querySelector(':scope > .box');
+        const childrenCol = node.querySelector(':scope > .children-container');
+        if (!box || !childrenCol) return;
+        const rectP = box.getBoundingClientRect();
+        const x1 = rectP.right  - rectRoot.left;
+        const y1 = rectP.top    - rectRoot.top  + rectP.height/2;
+        childrenCol.querySelectorAll(':scope > .tree-node').forEach(ch => {
+          const childBox = ch.querySelector(':scope > .box') || ch;
+          const rectC = childBox.getBoundingClientRect();
+          const x2 = rectC.left  - rectRoot.left;
+          const y2 = rectC.top   - rectRoot.top  + rectC.height/2;
+          const dx = Math.max(30, (x2 - x1) / 2);
+          const d  = `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', d);
+          path.setAttribute('stroke', '#000');
+          path.setAttribute('stroke-width', '2');
+          path.setAttribute('fill', 'none');
+          svgEl.appendChild(path);
+        });
+      });
+    })(clone);
+
+    return clone;
+  }
+
+  function computeSafeBreaks(rootEl, approxPx){
+    const rectRoot = rootEl.getBoundingClientRect();
+    const bottoms = Array.from(rootEl.querySelectorAll('.box'))
+      .map(el => el.getBoundingClientRect().bottom - rectRoot.top)
+      .sort((a,b)=>a-b);
+    const total = Math.max(rootEl.scrollHeight, rootEl.clientHeight);
+    const breaks = [0];
+    let last = 0;
+    const minGap = 280, tolerance = 160;
+    while (last + approxPx < total){
+      const target = last + approxPx;
+      let candList = bottoms.filter(y => y >= last + minGap && y <= target + tolerance);
+      let cand = candList.length ? candList[candList.length-1] : null;
+      if (!cand){
+        candList = bottoms.filter(y => y >= last + minGap && y < target);
+        cand = candList.length ? candList[candList.length-1] : null;
+      }
+      breaks.push(cand || target);
+      last = cand || target;
+    }
+    breaks.push(total);
+    return breaks;
+  }
+
+  document.getElementById('export-svg').addEventListener('click', async function () {
+    const clone = buildPrintableClone();
+    try{
+      const w = Math.max(clone.scrollWidth, clone.clientWidth) + EXTRA_RIGHT;
+      const h = Math.max(clone.scrollHeight, clone.clientHeight) + EXTRA_BOTTOM;
+      const styles = Array.from(document.querySelectorAll('style')).map(s => s.textContent).join('\n');
+      const svgWrap =
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+           <foreignObject x="0" y="0" width="${w}" height="${h}">
+             <div xmlns="http://www.w3.org/1999/xhtml" style="width:${w}px;height:${h}px;background:#fff;">
+               <style>${styles}</style>
+               ${clone.innerHTML}
+             </div>
+           </foreignObject>
+         </svg>`;
+      const blob = new Blob([svgWrap], {type:'image/svg+xml;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'organigramma.svg';
+      document.body.appendChild(a); a.click();
+      URL.revokeObjectURL(url); a.remove();
+    } finally { clone.remove(); }
+  });
+
+  document.getElementById('export-pdf').addEventListener('click', async function () {
+    const clone = buildPrintableClone();
+    try{
+      const canvas = await html2canvas(clone, {backgroundColor:'#ffffff', scale:2, useCORS:true, scrollX:0, scrollY:0});
+      const totalW = canvas.width;
+      const cloneHeightCss = Math.max(clone.scrollHeight, clone.clientHeight);
+      const breaks = computeSafeBreaks(clone, 1600);
+      const scale = canvas.height / cloneHeightCss;
+      const cuts = breaks.map(y => Math.round(y * scale));
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF('l','pt','a4');
+      const MARGIN = 20;
+      const pageW = pdf.internal.pageSize.getWidth() - MARGIN*2;
+      const pageH = pdf.internal.pageSize.getHeight() - MARGIN*2;
+
+      for (let i=0; i<cuts.length-1; i++){
+        const y1 = cuts[i], y2 = cuts[i+1], sliceH = y2 - y1;
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = totalW; pageCanvas.height = sliceH;
+        pageCanvas.getContext('2d').drawImage(canvas, 0, y1, totalW, sliceH, 0, 0, totalW, sliceH);
+
+        let s = pageW / totalW;
+        let drawW = pageW, drawH = sliceH * s;
+        if (drawH > pageH){ s = pageH / sliceH; drawH = pageH; drawW = totalW * s; }
+        const imgData = pageCanvas.toDataURL('image/png');
+        if (i>0) pdf.addPage();
+        pdf.addImage(imgData, 'PNG', MARGIN + (pageW-drawW)/2, MARGIN, drawW, drawH);
+      }
+      pdf.save('organigramma.pdf');
+    } finally { clone.remove(); }
+  });
+
+  window.addEventListener('load', drawLinks);
+  window.addEventListener('resize', drawLinks);
+  window.addEventListener('scroll', drawLinks, { passive:true });
+  drawLinks();
+});
+</script>
+{% endblock %}

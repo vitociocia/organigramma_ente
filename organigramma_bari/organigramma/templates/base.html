@@ -1,0 +1,249 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}Organigramma - Comune di Bari{% endblock %}</title>
+
+  <!-- Bootstrap Italia -->
+  <link rel="stylesheet" href="{% static 'css/bootstrap-italia.min.css' %}">
+  <script src="{% static 'js/bootstrap-italia.bundle.min.js' %}" defer></script>
+  <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+
+  <!-- Palette & UI locali -->
+  <style>
+    :root{
+      /* Palette “Comune di Bari” (accessibile) */
+      --bs-primary:#B50938;           /* rosso istituzionale */
+      --bs-primary-rgb:181,9,56;
+      --bs-secondary:#0B5ED7;         /* blu accessibile */
+      --bs-secondary-rgb:11,94,215;
+      --header-bg:#f8fafc;
+      --card-border:#e8ecf1;
+    }
+
+    /* Blocchi (legacy organigramma) */
+    .struttura-blocco .box{
+      width:280px;padding:10px;border:1px solid #ccc;background:#f9f9f9;
+      border-radius:8px;text-align:left
+    }
+    .line-vertical{position:absolute;width:2px;height:40px;background:black}
+    .line-horizontal{position:absolute;height:2px;background:black}
+
+    /* Header */
+    .it-header-wrapper{background:var(--header-bg)}
+    .it-nav-wrapper{border-top:1px solid #eef1f4}
+
+    /* Navbar */
+    .navbar .nav-link{
+      position:relative;border-radius:.6rem;padding:.45rem .85rem;
+      transition:background-color .15s ease,color .15s ease,box-shadow .2s ease,transform .05s ease
+    }
+    .navbar .nav-link:hover,.navbar .nav-link:focus{background:rgba(0,0,0,.04);text-decoration:none}
+    .navbar .nav-link.active{
+      color:#fff !important;background:var(--bs-primary);
+      box-shadow:0 .35rem .9rem rgba(0,0,0,.08)
+    }
+    
+    /* Pulsanti elenco + Esci */
+    .btn-list,.btn-exit{
+      border-radius:.6rem;padding:.45rem .85rem;
+      box-shadow:0 .2rem .6rem rgba(0,0,0,.06);
+      transition:transform .05s ease,box-shadow .2s ease
+    }
+    .btn-list:hover,.btn-exit:hover{transform:translateY(-1px);box-shadow:0 .45rem 1.1rem rgba(0,0,0,.08)}
+
+    /* Card dashboard */
+    .card{
+      border-radius:1rem;border:1px solid var(--card-border);
+      transition:transform .12s ease,box-shadow .18s ease,border-color .18s ease,background .18s ease
+    }
+    .card:hover{transform:translateY(-2px);box-shadow:0 .75rem 1.5rem rgba(0,0,0,.07);border-color:#d9e1ea;background:#fff}
+    .card .card-title{font-weight:600;letter-spacing:.1px}
+    .card .card-body{padding:1rem 1.1rem}
+    a .card{border-top-width:3px;border-top-color:transparent}
+    a:hover .card{border-top-color:var(--bs-primary)}
+
+    /* Piccole utilità */
+    .icon{vertical-align:middle}
+    .brand-title{font-size:1.15rem;margin:0}
+  </style>
+
+  <!-- Favicon -->
+  <link rel="icon" href="{% static 'assets/favicon.ico' %}">
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+<header class="it-header-wrapper">
+  {% if messages %}
+    <div class="container my-2">
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }} mb-2" role="alert">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <!-- Barra sottile -->
+  <div class="it-header-slim-wrapper">
+    <div class="container">
+      <div class="it-header-slim-wrapper-content">
+        <a class="navbar-brand" href="{% url 'home' %}">Comune di Bari</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Brand + Nav -->
+  <div class="it-nav-wrapper">
+    <div class="it-header-center-wrapper">
+      <div class="container">
+        <div class="it-header-center-content-wrapper d-flex align-items-center justify-content-between gap-3">
+
+          <!-- BRAND -->
+          <div class="it-brand-wrapper">
+            <a href="{% url 'home' %}" class="d-flex align-items-center gap-2 text-decoration-none">
+              <img src="{% static 'assets/logo.png' %}" alt="Logo" class="icon flex-shrink-0" width="32" height="32">
+              <div class="it-brand-text">
+                <h1 class="h5 fw-semibold mb-0">Portale Organigramma – Comune di Bari</h1>
+              </div>
+            </a>
+          </div>
+
+          <!-- RIGHT ZONE -->
+          <div class="it-right-zone flex-grow-1">
+          {% if request.user.is_authenticated %}
+            {% with current=request.resolver_match.url_name|default:'' %}
+            <nav class="navbar navbar-expand-lg has-megamenu p-0">
+              <button class="custom-navbar-toggler ms-auto d-lg-none" type="button"
+                      data-bs-toggle="collapse" data-bs-target="#mainNav"
+                      aria-controls="mainNav" aria-expanded="false" aria-label="Apri menu">
+                <span class="it-btn-menu">Menu</span>
+                <svg class="icon"><use href="{% static 'svg/sprites.svg' %}#it-burger"></use></svg>
+              </button>
+
+              <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav align-items-lg-center me-lg-3 flex-wrap">
+                  <li class="nav-item">
+                    <a class="nav-link {% if current in 'struttura_list struttura_create struttura_update struttura_delete' %}active{% endif %}"
+                       href="{% url 'struttura_list' %}">
+                      <svg class="icon"><use href="{% static 'svg/sprites.svg' %}#it-folder"></use></svg>
+                      <span>Strutture</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link {% if current in 'responsabile_list responsabile_create responsabile_update responsabile_delete' %}active{% endif %}"
+                       href="{% url 'responsabile_list' %}">
+                      <svg class="icon"><use href="{% static 'svg/sprites.svg' %}#it-user"></use></svg>
+                      <span>Responsabili</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link {% if current in 'qualifica_list qualifica_create qualifica_update qualifica_delete' %}active{% endif %}"
+                       href="{% url 'qualifica_list' %}">
+                      <svg class="icon"><use href="{% static 'svg/sprites.svg' %}#it-bookmark"></use></svg>
+                      <span>Qualifiche</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link {% if current == 'visualizza_organigramma' %}active{% endif %}"
+                       href="{% url 'visualizza_organigramma' %}">
+                      <svg class="icon"><use href="{% static 'svg/sprites.svg' %}#it-pa"></use></svg>
+                      <span>Organigramma</span>
+                    </a>
+                  </li>
+                  {% if perms.organigramma.view_simulatore %}
+                  <li class="nav-item">
+                    <a class="nav-link {% if current == 'simula_organigramma' %}active{% endif %}"
+                       href="{% url 'simula_organigramma' %}">
+                      <!-- id esistente nello sprite -->
+                      <svg class="icon"><use href="{% static 'svg/sprites.svg' %}#it-software"></use></svg>
+                      <span>Simulatore</span>
+                    </a>
+                  </li>
+                  {% endif %}
+                  {% if perms.auth.view_user %}
+                  <li class="nav-item">
+                    <a class="nav-link {% if current in 'user_list user_create user_update user_permissions' %}active{% endif %}"
+                       href="{% url 'user_list' %}">
+                      <svg class="icon"><use href="{% static 'svg/sprites.svg' %}#it-settings"></use></svg>
+                      <span>Utenti</span>
+                    </a>
+                  </li>
+                  {% endif %}
+                </ul>
+
+                <!-- USER -->
+                <ul class="navbar-nav">
+                  <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle d-inline-flex align-items-center gap-2" href="#" id="userMenu"
+                       data-bs-toggle="dropdown" aria-expanded="false">
+                      <svg class="icon"><use href="{% static 'svg/sprites.svg' %}#it-user"></use></svg>
+                      <span>{{ request.user.username }}</span>
+                      {% with g=request.user.groups.all.0 %}
+                        {% if g %}<span class="badge bg-primary ms-1">{{ g.name }}</span>{% endif %}
+                      {% endwith %}
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+                      {% if perms.auth.view_user %}
+                        <a class="dropdown-item d-inline-flex align-items-center gap-2" href="{% url 'user_list' %}">
+                          <svg class="icon"><use href="{% static 'svg/sprites.svg' %}#it-settings"></use></svg>
+                          <span>Gestione utenti</span>
+                        </a>
+                        <div class="dropdown-divider"></div>
+                      {% endif %}
+                      <a class="dropdown-item text-danger d-inline-flex align-items-center gap-2" href="{% url 'logout' %}">
+                        <svg class="icon"><use href="{% static 'svg/sprites.svg' %}#it-logout"></use></svg>
+                        <span>Esci</span>
+                      </a>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+            </nav>
+            {% endwith %}
+          {% else %}
+            <!-- versione non autenticato: bottone come i pulsanti navbar -->
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+              <a class="btn btn-sm bg-transparent border border-white text-white rounded-2 d-inline-flex align-items-center justify-content-center gap-2 px-3"
+                 href="{% url 'login' %}">
+                <svg class="icon"><use href="{% static 'svg/sprites.svg' %}#it-user"></use></svg>
+                <span>Accedi</span>
+              </a>
+              <div class="forgot-hint d-inline-flex align-items-center gap-2">
+                <svg class="icon"><use href="{% static 'svg/sprites.svg' %}#it-info-circle"></use></svg>
+                <span>Password dimenticata? Scrivi a
+                  <a class="text-white fw-semibold" href="mailto:v.ciocia@comune.bari.it">v.ciocia@comune.bari.it</a>
+                </span>
+              </div>
+            </div>         
+          </div>
+          {% endif %}
+          </div><!-- /it-right-zone -->
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+
+{% block container %}
+  <div class="container my-5">
+    <div class="alert alert-warning">Contenuto non definito.</div>
+  </div>
+{% endblock %}
+
+<footer class="it-footer">
+  <div class="it-footer-main">
+    <div class="container">
+      <section class="py-4 border-top">
+        <div class="row">
+          <div class="col-12 text-center">
+            <p class="mb-0">© 2025 Comune di Bari – Progetto Organigramma</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Crea utente{% endblock %}
+{% block container %}
+<div class="container my-4" style="max-width:720px">
+  <h2 class="mb-3">Crea utente</h2>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="mb-3">
+      <label class="form-label" for="{{ form.username.id_for_label }}">Username</label>
+      {{ form.username }}
+      {{ form.username.errors }}
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label" for="{{ form.email.id_for_label }}">Email</label>
+      {{ form.email }}
+      {{ form.email.errors }}
+    </div>
+
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label class="form-label" for="{{ form.password1.id_for_label }}">Password</label>
+        {{ form.password1 }}
+        {{ form.password1.errors }}
+      </div>
+      <div class="col-md-6 mb-3">
+        <label class="form-label" for="{{ form.password2.id_for_label }}">Conferma password</label>
+        {{ form.password2 }}
+        {{ form.password2.errors }}
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label" for="{{ form.gruppo.id_for_label }}">Ruolo</label>
+      {{ form.gruppo }}
+      {{ form.gruppo.errors }}
+    </div>
+
+    <div class="form-check mb-3">
+      {{ form.is_superuser }}
+      <label class="form-check-label" for="{{ form.is_superuser.id_for_label }}">Amministratore (superuser)</label>
+      {{ form.is_superuser.errors }}
+    </div>
+
+    <button class="btn btn-primary">Crea utente</button>
+  </form>
+</div>
+{% endblock %}
