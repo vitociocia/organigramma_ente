@@ -1,0 +1,25 @@
+<div class="struttura-blocco" style="position: absolute; left: {{ struttura.x_offset }}px; top: {{ struttura.y_offset }}px;">
+  <div class="box">
+    <strong>{{ struttura.nome }}</strong><br>
+    {% if struttura.responsabile.nome %}
+      {{ struttura.responsabile.nome }} {{ struttura.responsabile.cognome }}<br>
+      <em>{{ struttura.responsabile.qualifica }}</em>
+    {% else %}
+      <em>Nessun responsabile</em>
+    {% endif %}
+  </div>
+
+  {% for child in struttura.children %}
+    <!-- Linea verticale verso il figlio -->
+    <div class="line-vertical" style="top: 80px; left: 140px;"></div>
+
+    <!-- Linea orizzontale tra padre e figlio -->
+    <div class="line-horizontal" style="
+        top: 80px;
+        left: {% widthratio child.x_offset 1 1 %}px;
+        width: {{ child.x_offset|add:"-140" }}px;
+      "></div>
+
+    {% include "organigramma/_struttura_blocco.html" with struttura=child %}
+  {% endfor %}
+</div>

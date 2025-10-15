@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Modifica utente{% endblock %}
+{% block container %}
+<div class="container my-4" style="max-width:720px">
+  <h2 class="mb-3">Modifica utente</h2>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="mb-3">
+      <label class="form-label" for="{{ form.username.id_for_label }}">Username</label>
+      {{ form.username }}
+      {{ form.username.errors }}
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label" for="{{ form.email.id_for_label }}">Email</label>
+      {{ form.email }}
+      {{ form.email.errors }}
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label" for="{{ form.gruppo.id_for_label }}">Ruolo</label>
+      {{ form.gruppo }}
+      {{ form.gruppo.errors }}
+    </div>
+
+    <div class="form-check mb-2">
+      {{ form.is_active }}
+      <label class="form-check-label" for="{{ form.is_active.id_for_label }}">Attivo</label>
+      {{ form.is_active.errors }}
+    </div>
+
+    <div class="form-check mb-4">
+      {{ form.is_superuser }}
+      <label class="form-check-label" for="{{ form.is_superuser.id_for_label }}">Amministratore (superuser)</label>
+      {{ form.is_superuser.errors }}
+    </div>
+
+    <button class="btn btn-primary">Salva</button>
+    <a class="btn btn-outline-secondary ms-2" href="{% url 'user_list' %}">Annulla</a>
+  </form>
+</div>
+{% endblock %}

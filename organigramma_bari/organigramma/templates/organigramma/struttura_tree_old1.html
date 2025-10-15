@@ -1,0 +1,69 @@
+{# organigramma/struttura_tree.html #}
+<div class="tree-node {% if struttura.children %}has-children{% endif %}">
+  <div class="box">
+    <div class="box-title">
+      {% if struttura.url %}
+        <a href="{{ struttura.url }}" target="_blank" rel="noopener">{{ struttura.nome }}</a>
+      {% else %}
+        {{ struttura.nome }}
+      {% endif %}
+    </div>
+
+    <div class="box-detail">
+      {# --- RESPONSABILE: prova tutte le forme comuni --- #}
+      {% if struttura.responsabile %}
+        {# responsabile come oggetto con nome/cognome #}
+        Responsabile:
+        {{ struttura.responsabile.nome|default_if_none:"" }}
+        {{ struttura.responsabile.cognome|default_if_none:"" }}
+      {% elif struttura.responsabile_nome or struttura.responsabile_cognome %}
+        {# responsabile come campi sciolti #}
+        Responsabile:
+        {{ struttura.responsabile_nome|default:"" }} {{ struttura.responsabile_cognome|default:"" }}
+      {% elif struttura.responsabile_fullname %}
+        Responsabile: {{ struttura.responsabile_fullname }}
+      {% elif struttura.responsabile_str %}
+        Responsabile: {{ struttura.responsabile_str }}
+      {% else %}
+        <span class="text-muted">Responsabile non assegnato</span>
+      {% endif %}
+
+      {% if struttura.livello %} · Livello {{ struttura.livello }}{% endif %}
+
+      {# --- Badge attiva/non attiva rispetto a on_date --- #}
+      {% with di=struttura.data_inizio df=struttura.data_fine %}
+        <span class="ms-1 badge
+          {% if di and on_date and on_date < di %}
+            bg-secondary
+          {% elif df and on_date and on_date >= df %}
+            bg-secondary
+          {% else %}
+            bg-success
+          {% endif %}">
+          {% if di and on_date and on_date < di %}
+            Non attiva
+          {% elif df and on_date and on_date >= df %}
+            Non attiva
+          {% else %}
+            Attiva
+          {% endif %}
+        </span>
+      {% endwith %}
+    </div>
+
+    {% if struttura.children and struttura.children|length > 0 %}
+      <div class="mt-2">
+        <button class="btn btn-sm btn-outline-primary toggle-children">Nascondi sottostrutture ⬆️</button>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if struttura.children and struttura.children|length > 0 %}
+    <div class="children-container">
+      {% for child in struttura.children %}
+        {# IMPORTANTE: passa anche on_date nella ricorsione #}
+        {% include "organigramma/struttura_tree.html" with struttura=child on_date=on_date only %}
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

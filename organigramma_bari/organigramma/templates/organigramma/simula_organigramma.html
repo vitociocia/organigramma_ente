@@ -1,0 +1,614 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<!-- librerie export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+:root{
+  --h-gap: 64px;
+  --v-gap: 40px;
+
+  /* manopole orizzontali (default) */
+  --indent-dg-1: 180px;  /* DG → 1° livello */
+  --indent-1-2:  200px;  /* 1° → 2° livello */
+  --indent-2-3:  220px;  /* 2° → 3° livello */
+}
+
+/* toolbar */
+.toolbar{ display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
+
+/* pannellino layout */
+#layout-panel.card{
+  display:flex; align-items:center; gap:8px; padding:.5rem .75rem;
+}
+#layout-panel .ctrl{ display:flex; align-items:center; gap:.35rem; }
+#layout-panel .ctrl label{ font-size:.85rem; white-space:nowrap; }
+#layout-panel .ctrl input{ width:84px; }
+
+/* contenitore albero: nessuna scrollbar interne (si scorre col browser) */
+.tree{
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 28px;
+  padding: 8px 8px 12px;
+  overflow: visible;
+  background: #fff;
+}
+
+/* layer connettori */
+#links-layer{ position:absolute; left:0; top:0; pointer-events:none; z-index:0; }
+
+/* nodo e box */
+.tree-node{ display:flex; flex-direction:row; align-items:center; position:relative; }
+.box{
+  background:#fff; border:2px solid #000; border-radius:6px;
+  padding:12px 18px; min-width:280px; text-align:center; position:relative; z-index:1;
+}
+.box-title{ font-weight:700; color:#000; font-size:16px; }
+.box-title a{ color:inherit; text-decoration:none; border-bottom:1px dashed #000; }
+.box-detail{ font-size:13px; color:#444; }
+.box-actions{ margin-top:8px; display:flex; gap:6px; justify-content:center; flex-wrap:wrap; }
+
+/* default: figli a DESTRA in colonna (verticale) */
+.children-container{
+  display:flex;
+  flex-direction: column;
+  gap: var(--v-gap);
+  margin-left: var(--h-gap);
+}
+
+/* DG (livello_ordine == 6) → figli impilati sotto con aria e INDENT orizzontale regolabile */
+.below-children > .children-container{
+  flex-direction: column;
+  margin-left: var(--indent-dg-1);
+  margin-top: calc(var(--v-gap) * 2.25);
+  gap: calc(var(--v-gap) * 1.75);
+}
+
+/* Dal 1° livello in giù: figli impilati IN VERTICALE con INDENT regolabile */
+.stack-below > .children-container{
+  flex-direction: column;
+  margin-left: 0;
+  margin-top: calc(var(--v-gap) * 2.0);
+  gap: calc(var(--v-gap) * 1.25);
+}
+
+/* tuning + INDENT 1→2 e 2→3 */
+.node-livello-7.stack-below > .children-container{
+  margin-top: calc(var(--v-gap) * 2.2);
+  margin-left: var(--indent-1-2);
+}
+.node-livello-8.stack-below > .children-container{
+  margin-top: calc(var(--v-gap) * 2.0);
+  margin-left: var(--indent-2-3);
+}
+.node-livello-9.stack-below > .children-container{
+  margin-top: calc(var(--v-gap) * 1.8);
+}
+
+/* varie */
+.badge-sim{ background:#6610f2; color:#fff; padding:.15rem .4rem; border-radius:.35rem; font-size:.75rem; }
+.d-none{ display:none !important; }
+
+/* mini–modal semplice */
+.modal-lite-backdrop{
+  position:fixed; inset:0; background:rgba(0,0,0,.35);
+  display:flex; align-items:center; justify-content:center; z-index:2000;
+}
+.modal-lite{
+  background:#fff; border-radius:10px; padding:16px; width:min(520px, 92vw);
+  box-shadow:0 10px 30px rgba(0,0,0,.2);
+}
+.modal-lite header{ font-weight:700; margin-bottom:.5rem; }
+.modal-lite .actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+</style>
+{% endblock %}
+
+{% block container %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="mb-0">
+      Simulatore Organigramma <span class="badge-sim">bozza locale</span>
+    </h2>
+    {% if on_date %}<small class="text-muted">Data di riferimento: {{ on_date }}</small>{% endif %}
+  </div>
+
+  <div class="alert alert-info">
+    Questo simulatore <strong>non scrive</strong> sul database. Puoi spostare strutture, cambiare responsabili
+    e poi <u>esportare PNG/PDF</u>. Aggiorna la pagina per tornare allo stato reale.
+  </div>
+
+  <div class="toolbar mb-3">
+    <form method="get" class="d-flex align-items-center gap-2">
+      <label class="form-label mb-0">Data:</label>
+      <input type="date" name="on" class="form-control" style="max-width:200px" value="{{ on_date }}">
+      <button type="submit" class="btn btn-outline-primary">Ricarica</button>
+    </form>
+
+    <button id="export-png" class="btn btn-secondary ms-auto">Scarica PNG (multi-pagina, ZIP)</button>
+    <button id="export-pdf" class="btn btn-danger">Scarica PDF (multi-pagina)</button>
+    <button id="reset-draft" class="btn btn-outline-secondary">Reset bozza</button>
+    <a class="btn btn-outline-dark" href="{% url 'visualizza_organigramma' %}?on={{ on_date }}">Torna alla vista reale</a>
+  </div>
+
+  <div class="tree" id="tree-container">
+    <svg id="links-layer"></svg>
+    <!-- il renderer JS inietterà i nodi -->
+  </div>
+</div>
+
+<!-- dati JSON iniettati dal server -->
+<script>window.__ORG_DATA__ = {{ data_json|safe }};</script>
+<script>window.__RESP_CHOICES__ = {{ resp_choices_json|safe }};</script>
+
+<script>
+  const PNG_APPROX_SLICE = 1600;   // altezza indicativa per pagina PNG/PDF
+
+  function canvasToBlob(canvas, type='image/png', quality=1.0){
+    return new Promise(res => canvas.toBlob(b => res(b), type, quality));
+  }
+
+  // --- CLONE PER STAMPA/EXPORT (con extra margine destro) ---
+  function buildPrintableClone() {
+    const source = document.getElementById('tree-container');
+
+    // extra a destra per evitare tagli dei figli più larghi
+    const EXTRA_RIGHT = 220;
+
+    const clone = source.cloneNode(true);
+    clone.id = 'tree-container-print-' + Date.now();
+    Object.assign(clone.style, {
+      position:'absolute', left:'-100000px', top:'0',
+      overflow:'visible', padding:'80px', background:'#ffffff'
+    });
+
+    // blocca una larghezza ampia prima del render
+    const firstW = Math.max(source.scrollWidth, source.clientWidth) + EXTRA_RIGHT;
+    clone.style.width = firstW + 'px';
+    clone.style.paddingRight = (parseInt(clone.style.paddingRight || 0,10) + EXTRA_RIGHT) + 'px';
+
+    // pulizia e espansione
+    clone.querySelectorAll('.box-actions').forEach(el => el.remove());
+    clone.querySelectorAll('.children-container').forEach(el => el.classList.remove('d-none'));
+
+    document.body.appendChild(clone);
+
+    // disegna connettori sul clone (coordinate relative)
+    function drawLinksIn(rootEl){
+      const svgEl = rootEl.querySelector('#links-layer');
+      const w = Math.max(rootEl.scrollWidth, rootEl.clientWidth);
+      const h = Math.max(rootEl.scrollHeight, rootEl.clientHeight);
+      svgEl.setAttribute('width', w); svgEl.setAttribute('height', h);
+      while (svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
+      const rectRoot = rootEl.getBoundingClientRect();
+      rootEl.querySelectorAll('.tree-node').forEach(node => {
+        const box = node.querySelector(':scope > .box');
+        const childrenCol = node.querySelector(':scope > .children-container');
+        if (!box || !childrenCol) return;
+        const rectP = box.getBoundingClientRect();
+        const x1 = rectP.right  - rectRoot.left;
+        const y1 = rectP.top    - rectRoot.top  + rectP.height/2;
+        childrenCol.querySelectorAll(':scope > .tree-node').forEach(ch => {
+          const childBox = ch.querySelector(':scope > .box') || ch;
+          const rectC = childBox.getBoundingClientRect();
+          const x2 = rectC.left  - rectRoot.left;
+          const y2 = rectC.top   - rectRoot.top  + rectC.height/2;
+          const dx = Math.max(30, (x2 - x1) / 2);
+          const d  = `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', d);
+          path.setAttribute('stroke', '#000');
+          path.setAttribute('stroke-width', '2');
+          path.setAttribute('fill', 'none');
+          svgEl.appendChild(path);
+        });
+      });
+    }
+    drawLinksIn(clone);
+
+    // dopo il primo disegno ricalcola (se si è allargato) e ridisegna
+    const finalW = Math.max(clone.scrollWidth, clone.clientWidth);
+    if (finalW > firstW){
+      clone.style.width = (finalW + EXTRA_RIGHT) + 'px';
+      drawLinksIn(clone);
+    }
+
+    return clone;
+  }
+
+  // --- TAGLI VERTICALI "SICURI" ---
+  function computeSafeBreaks(rootEl, approxPx){
+    const rectRoot = rootEl.getBoundingClientRect();
+    const bottoms = Array
+      .from(rootEl.querySelectorAll('.box'))
+      .map(el => el.getBoundingClientRect().bottom - rectRoot.top)
+      .sort((a,b)=>a-b);
+
+    const total = Math.max(rootEl.scrollHeight, rootEl.clientHeight);
+    const breaks = [0];
+    let last = 0;
+    const minGap = 280;
+    const tolerance = 160;
+
+    while (last + approxPx < total){
+      const target = last + approxPx;
+      let candList = bottoms.filter(y => y >= last + minGap && y <= target + tolerance);
+      let cand = candList.length ? candList[candList.length-1] : null;
+      if (!cand){
+        candList = bottoms.filter(y => y >= last + minGap && y < target);
+        cand = candList.length ? candList[candList.length-1] : null;
+      }
+      breaks.push(cand || target);
+      last = cand || target;
+    }
+    breaks.push(total);
+    return breaks;
+  }
+
+document.addEventListener('DOMContentLoaded', function () {
+  const tree = document.getElementById('tree-container');
+  const svg  = document.getElementById('links-layer');
+
+  const ORIGINAL = JSON.parse(JSON.stringify(window.__ORG_DATA__ || []));
+  let draft = JSON.parse(JSON.stringify(ORIGINAL));
+  const RESP = window.__RESP_CHOICES__ || [];
+
+  /* ------------ RENDER ------------ */
+  function render(){
+    while (tree.firstChild) tree.removeChild(tree.firstChild);
+    tree.appendChild(svg);
+    draft.forEach(node => { tree.appendChild(renderNode(node)); });
+    drawLinks();
+  }
+
+  function renderNode(node){
+    const wrapper = document.createElement('div');
+    const isDG = Number(node.livello_ordine) === 6;
+    const isStack = Number(node.livello_ordine) >= 7;
+    wrapper.className = `tree-node node-livello-${node.livello_ordine ?? 'x'}${isDG ? ' below-children' : ''}${isStack ? ' stack-below' : ''}`;
+
+    const box = document.createElement('div');
+    box.className = 'box';
+
+    const title = document.createElement('div');
+    title.className = 'box-title';
+    title.textContent = node.nome || '(senza nome)';
+    box.appendChild(title);
+
+    const det = document.createElement('div');
+    det.className = 'box-detail';
+    det.innerHTML = [
+      node.livello ? `<div><strong>${node.livello}</strong></div>` : '',
+      node.codice ? `<div>Codice: ${node.codice}</div>` : '',
+      (node.responsabile_nome || node.responsabile_cognome)
+        ? `<div>Resp.: ${node.responsabile_nome || ''} ${node.responsabile_cognome || ''}</div>`
+        : `<div class="text-muted">Responsabile: —</div>`,
+      node.qualifica ? `<div class="text-muted">${node.qualifica}</div>` : ''
+    ].join('');
+    box.appendChild(det);
+
+    const actions = document.createElement('div');
+    actions.className = 'box-actions';
+
+    const btnMove = document.createElement('button');
+    btnMove.type = 'button';
+    btnMove.className = 'btn btn-sm btn-outline-primary';
+    btnMove.textContent = 'Sposta sotto…';
+    btnMove.addEventListener('click', () => openMoveModal(node.id));
+    actions.appendChild(btnMove);
+
+    const btnResp = document.createElement('button');
+    btnResp.type = 'button';
+    btnResp.className = 'btn btn-sm btn-outline-secondary';
+    btnResp.textContent = 'Cambia responsabile…';
+    btnResp.addEventListener('click', () => openRespModal(node.id));
+    actions.appendChild(btnResp);
+
+    if (node.children && node.children.length){
+      const btnToggle = document.createElement('button');
+      btnToggle.type = 'button';
+      btnToggle.className = 'btn btn-sm btn-outline-dark toggle-children';
+      btnToggle.textContent = 'Nascondi sottostrutture ⬆️';
+      btnToggle.addEventListener('click', () => {
+        children.classList.toggle('d-none');
+        btnToggle.textContent = children.classList.contains('d-none')
+          ? 'Mostra sottostrutture ⬇️' : 'Nascondi sottostrutture ⬆️';
+        drawLinks();
+      });
+      actions.appendChild(btnToggle);
+    }
+
+    box.appendChild(actions);
+    wrapper.appendChild(box);
+
+    const children = document.createElement('div');
+    children.className = 'children-container';
+    (node.children || []).forEach(ch => children.appendChild(renderNode(ch)));
+    wrapper.appendChild(children);
+
+    return wrapper;
+  }
+
+  /* ------------ UTIL ALBERO ------------ */
+  function walk(nodes, fn, parent=null){
+    nodes.forEach(n => {
+      fn(n, parent);
+      if (n.children && n.children.length) walk(n.children, fn, n);
+    });
+  }
+  function findNodeById(nodes, id){
+    let found = null; walk(nodes, (n)=>{ if (n.id === id) found = n; });
+    return found;
+  }
+  function findParentOf(nodes, id){
+    let p = null; walk(nodes, (n,parent)=>{ if (n.id === id) p = parent; });
+    return p;
+  }
+  function isDescendant(root, maybe) {
+    let hit = false; walk([root], (n)=>{ if (n.id === maybe.id) hit = true; });
+    return hit;
+  }
+  function allNodesFlat(nodes){ const arr=[]; walk(nodes,(n)=>arr.push(n)); return arr; }
+
+  /* ------------ MODALI ------------ */
+  function openMoveModal(nodeId){
+    const node = findNodeById(draft, nodeId);
+    if (!node) return;
+    const candidates = allNodesFlat(draft).filter(n => n.id !== node.id && !isDescendant(node, n));
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'modal-lite-backdrop';
+    wrapper.innerHTML = `
+      <div class="modal-lite">
+        <header>Sposta <em>${node.nome}</em> sotto…</header>
+        <div>
+          <select class="form-select" id="moveTarget">
+            <option value="">(radice)</option>
+            ${candidates.map(c => `<option value="${c.id}">${c.nome} — ${c.livello || ''} (${c.codice || ''})</option>`).join('')}
+          </select>
+          <div class="form-text mt-1">Operazione solo in bozza locale.</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondary" id="cancelBtn">Annulla</button>
+          <button class="btn btn-primary" id="okBtn">Conferma</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrapper);
+    wrapper.querySelector('#cancelBtn').onclick = () => wrapper.remove();
+    wrapper.querySelector('#okBtn').onclick = () => {
+      const val = wrapper.querySelector('#moveTarget').value;
+      const oldParent = findParentOf(draft, node.id);
+      if (oldParent){
+        oldParent.children = (oldParent.children || []).filter(c => c.id !== node.id);
+      } else {
+        const idx = draft.findIndex(r => r.id === node.id);
+        if (idx >= 0) draft.splice(idx, 1);
+      }
+      if (val){
+        const newParent = findNodeById(draft, parseInt(val,10));
+        if (!newParent.children) newParent.children = [];
+        newParent.children.push(node);
+      } else {
+        draft.push(node);
+      }
+      wrapper.remove();
+      render();
+    };
+  }
+
+  function openRespModal(nodeId){
+    const node = findNodeById(draft, nodeId);
+    if (!node) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'modal-lite-backdrop';
+    wrapper.innerHTML = `
+      <div class="modal-lite">
+        <header>Cambia responsabile per <em>${node.nome}</em></header>
+        <div>
+          <select class="form-select" id="respSelect">
+            <option value="">(nessuno)</option>
+            ${RESP.map(r => `<option value="${r.id}">${r.label}</option>`).join('')}
+          </select>
+          <div class="form-text mt-1">Modifica applicata solo alla bozza.</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondary" id="cancelBtn">Annulla</button>
+          <button class="btn btn-primary" id="okBtn">Conferma</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrapper);
+
+    if (node.responsabile_id){
+      const sel = wrapper.querySelector('#respSelect');
+      if (sel) sel.value = String(node.responsabile_id);
+    }
+    wrapper.querySelector('#cancelBtn').onclick = () => wrapper.remove();
+    wrapper.querySelector('#okBtn').onclick = () => {
+      const val = wrapper.querySelector('#respSelect').value;
+      if (val){
+        const info = RESP.find(r => String(r.id) === String(val));
+        node.responsabile_id = parseInt(val,10);
+        if (info){
+          const parts = info.label.split('–');
+          const nomeCogn = parts[0].trim().split(' ');
+          node.responsabile_cognome = nomeCogn[0] || '';
+          node.responsabile_nome = nomeCogn.slice(1).join(' ') || '';
+          node.qualifica = (parts[1] || '').trim();
+        }
+      }else{
+        node.responsabile_id = null;
+        node.responsabile_nome = '';
+        node.responsabile_cognome = '';
+        node.qualifica = 'Vacante';
+      }
+      wrapper.remove();
+      render();
+    };
+  }
+
+  /* ------------ CONNETTORI (relative al container) ------------ */
+  function drawLinks(){
+    const w = Math.max(tree.scrollWidth, tree.clientWidth);
+    const h = Math.max(tree.scrollHeight, tree.clientHeight);
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    const rectTree = tree.getBoundingClientRect();
+
+    tree.querySelectorAll('.tree-node').forEach(node => {
+      const box = node.querySelector(':scope > .box');
+      const childrenCol = node.querySelector(':scope > .children-container');
+      if (!box || !childrenCol || childrenCol.classList.contains('d-none')) return;
+
+      const rectP = box.getBoundingClientRect();
+      const x1 = rectP.right  - rectTree.left;
+      const y1 = rectP.top    - rectTree.top  + rectP.height/2;
+
+      childrenCol.querySelectorAll(':scope > .tree-node').forEach(ch => {
+        if (ch.offsetParent === null) return;
+        const childBox = ch.querySelector(':scope > .box') || ch;
+        const rectC = childBox.getBoundingClientRect();
+
+        const x2 = rectC.left  - rectTree.left;
+        const y2 = rectC.top   - rectTree.top  + rectC.height/2;
+
+        const dx = Math.max(30, (x2 - x1) / 2);
+        const d  = `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', d);
+        path.setAttribute('stroke', '#000');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('fill', 'none');
+        svg.appendChild(path);
+      });
+    });
+  }
+
+  /* ------------ EXPORT: PDF (multi-pagina, LANDSCAPE) ------------ */
+  document.getElementById('export-pdf').addEventListener('click', async function () {
+    const clone = buildPrintableClone();
+    try{
+      const canvas = await html2canvas(clone, {backgroundColor:'#ffffff', scale:2, useCORS:true, scrollX:0, scrollY:0});
+
+      // tagli "intelligenti"
+      const cloneHeightCss = Math.max(clone.scrollHeight, clone.clientHeight);
+      const breaks = computeSafeBreaks(clone, PNG_APPROX_SLICE);
+      const scaleCanvas = canvas.height / cloneHeightCss;
+      const cuts = breaks.map(y => Math.round(y * scaleCanvas));
+
+      // jsPDF UMD compat + orizzontale
+      const jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+      const pdf = new jsPDFCtor('l', 'pt', 'a4');  // ← LANDSCAPE
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+
+      const MARGIN = 24;                           // margine interno
+      const availW = pageW - MARGIN*2;
+      const availH = pageH - MARGIN*2;
+
+      const totalW = canvas.width;
+
+      for (let i=0; i<cuts.length-1; i++){
+        const y1 = cuts[i];
+        const y2 = cuts[i+1];
+        const sliceH = y2 - y1;
+        if (sliceH <= 0) continue;
+
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width  = totalW;
+        pageCanvas.height = sliceH;
+        const ctx = pageCanvas.getContext('2d');
+        ctx.drawImage(canvas, 0, y1, totalW, sliceH, 0, 0, totalW, sliceH);
+
+        // scala per stare dentro ai margini
+        let s = availW / totalW;
+        let drawW = availW;
+        let drawH = sliceH * s;
+        if (drawH > availH) {
+          s = availH / sliceH;
+          drawH = availH;
+          drawW = totalW * s;
+        }
+        const x = MARGIN + Math.max(0, (availW - drawW) / 2);
+        const y = MARGIN;
+
+        const imgData = pageCanvas.toDataURL('image/png');
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, 'PNG', x, y, drawW, drawH);
+      }
+
+      pdf.save('organigramma_simulazione.pdf');
+    } finally {
+      clone.remove();
+    }
+  });
+
+  /* ------------ EXPORT: PNG (multi-pagina in ZIP) ------------ */
+  document.getElementById('export-png').addEventListener('click', async function () {
+    const clone = buildPrintableClone();
+    try{
+      const canvas = await html2canvas(clone, {backgroundColor:'#ffffff', scale:2, useCORS:true, scrollX:0, scrollY:0});
+      const totalW = canvas.width;
+
+      const cloneHeightCss = Math.max(clone.scrollHeight, clone.clientHeight);
+      const breaks = computeSafeBreaks(clone, PNG_APPROX_SLICE);
+      const scale = canvas.height / cloneHeightCss;
+      const cuts = breaks.map(y => Math.round(y * scale));
+
+      const zip = new JSZip();
+      const folder = zip.folder('organigramma_png');
+
+      for (let i=0; i<cuts.length-1; i++){
+        const y1 = cuts[i];
+        const y2 = cuts[i+1];
+        const sliceH = y2 - y1;
+        if (sliceH <= 0) continue;
+
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width  = totalW;
+        pageCanvas.height = sliceH;
+        const ctx = pageCanvas.getContext('2d');
+        ctx.drawImage(canvas, 0, y1, totalW, sliceH, 0, 0, totalW, sliceH);
+
+        const blob = await canvasToBlob(pageCanvas, 'image/png', 1.0);
+        folder.file(`organigramma_p${String(i+1).padStart(2,'0')}.png`, blob);
+      }
+
+      const zipBlob = await zip.generateAsync({type:'blob'});
+      saveAs(zipBlob, 'organigramma_simulazione_png.zip');
+    } finally {
+      clone.remove();
+    }
+  });
+
+  /* ------------ RESET & LISTENERS ------------ */
+  document.getElementById('reset-draft').addEventListener('click', function(){
+    draft = JSON.parse(JSON.stringify(ORIGINAL));
+    render();
+  });
+
+  window.addEventListener('resize', drawLinks);
+  window.addEventListener('scroll', drawLinks, { passive:true });
+
+  if ('ResizeObserver' in window){
+    const ro = new ResizeObserver(() => drawLinks());
+    ro.observe(tree);
+  }
+
+  if (document.fonts && document.fonts.ready){
+    document.fonts.ready.then(() => { render(); });
+  } else {
+    render();
+  }
+});
+</script>
+{% endblock %}

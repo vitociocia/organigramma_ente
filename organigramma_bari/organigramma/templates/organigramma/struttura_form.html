@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+
+{% block container %}
+<div class="container my-4">
+  <div class="col-lg-10 mx-auto">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="mb-0">
+        {% if form.instance.pk %}Modifica Struttura{% else %}Crea Nuova Struttura{% endif %}
+      </h2>
+      <div>
+        <a href="{% url 'struttura_list' %}" class="btn btn-outline-secondary">Torna alla lista</a>
+      </div>
+    </div>
+
+    {% if on_date %}
+      <div class="alert alert-info d-flex justify-content-between align-items-center">
+        <div>
+          Filtri attivi alla data: <strong>{{ on_date }}</strong>.
+          Le tendine “Responsabile” e “Struttura padre” mostrano elementi attivi a questa data.
+        </div>
+        <form method="get" class="d-inline-flex align-items-center gap-2">
+          <label class="form-label mb-0">Cambia data:</label>
+          <input type="date" name="on" class="form-control" style="max-width: 180px" value="{{ on_date }}">
+          <button type="submit" class="btn btn-outline-primary btn-sm">Applica</button>
+        </form>
+      </div>
+    {% endif %}
+
+    {% if form.instance.pk and form.instance.codice %}
+      <div class="alert alert-secondary">
+        <strong>Codice gerarchico:</strong>
+        <span class="badge bg-dark">{{ form.instance.codice }}</span>
+      </div>
+    {% endif %}
+
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+    {% if form.errors %}
+      <div class="alert alert-warning">Controlla i campi evidenziati.</div>
+    {% endif %}
+
+    <!-- ===== FORM PRINCIPALE STRUTTURA ===== -->
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      <div class="row g-3">
+        <!-- COLONNA SINISTRA -->
+        <div class="col-lg-8">
+          <!-- Info principali -->
+          <div class="card shadow-sm mb-3">
+            <div class="card-header"><strong>Informazioni principali</strong></div>
+            <div class="card-body">
+
+              <div class="mb-3">
+                <label class="form-label" for="{{ form.nome.id_for_label }}">Nome</label>
+                {{ form.nome }}
+                {% if form.nome.errors %}<div class="invalid-feedback d-block">{{ form.nome.errors|striptags }}</div>{% endif %}
+              </div>
+
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label" for="{{ form.livello.id_for_label }}">Livello</label>
+                  {{ form.livello }}
+                  {% if form.livello.errors %}<div class="invalid-feedback d-block">{{ form.livello.errors|striptags }}</div>{% endif %}
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label" for="{{ form.struttura_padre.id_for_label }}">Struttura padre</label>
+                  {{ form.struttura_padre }}
+                  <div class="form-text">{{ form.fields.struttura_padre.help_text }}</div>
+                  {% if form.struttura_padre.errors %}<div class="invalid-feedback d-block">{{ form.struttura_padre.errors|striptags }}</div>{% endif %}
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label" for="{{ form.responsabile.id_for_label }}">Responsabile</label>
+                  <div class="input-group">
+                    {{ form.responsabile }}
+                    <button class="btn btn-outline-primary" type="button" id="open-new-resp">
+                      Nuovo responsabile
+                    </button>
+                  </div>
+                  <div class="form-text">{{ form.fields.responsabile.help_text }}</div>
+                  {% if form.responsabile.errors %}<div class="invalid-feedback d-block">{{ form.responsabile.errors|striptags }}</div>{% endif %}
+                </div>
+
+                <div class="col-md-6 mb-3">
+                  <label class="form-label" for="{{ form.url.id_for_label }}">URL</label>
+                  <div class="input-group">
+                    {{ form.url }}
+                    {% if form.instance.url %}
+                      <a class="btn btn-outline-secondary" href="{{ form.instance.url }}" target="_blank" rel="noopener">Apri</a>
+                    {% endif %}
+                  </div>
+                  {% if form.url.errors %}<div class="invalid-feedback d-block">{{ form.url.errors|striptags }}</div>{% endif %}
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {# ===== Card Periodo di attività ===== #}
+          {% if form.instance.data_inizio and on_date and on_date < form.instance.data_inizio %}
+            <!-- NON ATTIVA -->
+            <div id="period-card" class="card shadow-sm mb-3 border-secondary">
+              <div class="card-header d-flex align-items-center bg-light text-muted">
+                <strong>Periodo di attività</strong>
+                <span id="status-badge" class="ms-2 badge bg-secondary">Non attiva</span>
+              </div>
+              <div class="card-body">
+                <div class="row">
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label" for="{{ form.data_inizio.id_for_label }}">Data inizio</label>
+                    {{ form.data_inizio }}
+                    <div class="form-text">{{ form.fields.data_inizio.help_text }}</div>
+                    {% if form.data_inizio.errors %}<div class="invalid-feedback d-block">{{ form.data_inizio.errors|striptags }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label" for="{{ form.data_fine.id_for_label }}">Data fine</label>
+                    {{ form.data_fine }}
+                    <div class="form-text">{{ form.fields.data_fine.help_text }}</div>
+                    {% if form.data_fine.errors %}<div class="invalid-feedback d-block">{{ form.data_fine.errors|striptags }}</div>{% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          {% elif form.instance.data_fine and on_date and on_date >= form.instance.data_fine %}
+            <!-- NON ATTIVA -->
+            <div id="period-card" class="card shadow-sm mb-3 border-secondary">
+              <div class="card-header d-flex align-items-center bg-light text-muted">
+                <strong>Periodo di attività</strong>
+                <span id="status-badge" class="ms-2 badge bg-secondary">Non attiva</span>
+              </div>
+              <div class="card-body">
+                <div class="row">
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label" for="{{ form.data_inizio.id_for_label }}">Data inizio</label>
+                    {{ form.data_inizio }}
+                    <div class="form-text">{{ form.fields.data_inizio.help_text }}</div>
+                    {% if form.data_inizio.errors %}<div class="invalid-feedback d-block">{{ form.data_inizio.errors|striptags }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label" for="{{ form.data_fine.id_for_label }}">Data fine</label>
+                    {{ form.data_fine }}
+                    <div class="form-text">{{ form.fields.data_fine.help_text }}</div>
+                    {% if form.data_fine.errors %}<div class="invalid-feedback d-block">{{ form.data_fine.errors|striptags }}</div>{% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          {% else %}
+            <!-- ATTIVA -->
+            <div id="period-card" class="card shadow-sm mb-3 border-success bg-success-subtle">
+              <div class="card-header d-flex align-items-center bg-success text-white">
+                <strong>Periodo di attività</strong>
+                <span id="status-badge" class="ms-2 badge bg-success">Attiva</span>
+              </div>
+              <div class="card-body">
+                <div class="row">
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label" for="{{ form.data_inizio.id_for_label }}">Data inizio</label>
+                    {{ form.data_inizio }}
+                    <div class="form-text">{{ form.fields.data_inizio.help_text }}</div>
+                    {% if form.data_inizio.errors %}<div class="invalid-feedback d-block">{{ form.data_inizio.errors|striptags }}</div>{% endif %}
+                  </div>
+                  <div class="col-md-6 mb-3">
+                    <label class="form-label" for="{{ form.data_fine.id_for_label }}">Data fine</label>
+                    {{ form.data_fine }}
+                    <div class="form-text">{{ form.fields.data_fine.help_text }}</div>
+                    {% if form.data_fine.errors %}<div class="invalid-feedback d-block">{{ form.data_fine.errors|striptags }}</div>{% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- COLONNA DESTRA -->
+        <div class="col-lg-4">
+          <div class="card shadow-sm h-100">
+            <div class="card-header"><strong>Codici e riferimenti</strong></div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-sm-6 mb-3">
+                  <label class="form-label" for="{{ form.num_ode.id_for_label }}">Numero ODE</label>
+                  {{ form.num_ode }}
+                  {% if form.num_ode.errors %}<div class="invalid-feedback d-block">{{ form.num_ode.errors|striptags }}</div>{% endif %}
+                </div>
+                <div class="col-sm-6 mb-3">
+                  <label class="form-label" for="{{ form.num_eng.id_for_label }}">Numero ENG</label>
+                  {{ form.num_eng }}
+                  {% if form.num_eng.errors %}<div class="invalid-feedback d-block">{{ form.num_eng.errors|striptags }}</div>{% endif %}
+                </div>
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label">Codice gerarchico</label>
+                <div class="form-control-plaintext">
+                  {% if form.instance.codice %}
+                    <span class="badge bg-dark">{{ form.instance.codice }}</span>
+                  {% else %}
+                    <span class="text-muted">sarà generato al salvataggio</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary">Salva</button>
+        <a href="{% url 'struttura_list' %}{% if on_date %}?on={{ on_date }}{% endif %}" class="btn btn-secondary">Annulla</a>
+      </div>
+    </form>
+    <!-- ===== /FORM PRINCIPALE ===== -->
+
+  </div>
+</div>
+
+<!-- ===== MODALE: NUOVO RESPONSABILE =====
+     IMPORTANTISSIMO: il modale è FUORI dal form principale per evitare form annidati
+-->
+<div class="modal fade" id="inlineResponsabileModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Nuovo Responsabile</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+      </div>
+      <div class="modal-body">
+        {% if resp_inline_form %}
+          <div id="inline-resp-errors" class="alert alert-danger d-none"></div>
+
+          <form id="inline-resp-form">
+            {% csrf_token %}
+            {{ resp_inline_form.management_form|default_if_none:"" }}
+            {{ resp_inline_form.as_p }}
+          </form>
+        {% else %}
+          <div class="alert alert-warning mb-0">
+            Modulo non disponibile. (La view deve passare <code>resp_inline_form</code>.)
+          </div>
+        {% endif %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Annulla</button>
+        <button type="button" id="save-inline-resp" class="btn btn-primary">
+          <span class="save-label">Salva</span>
+          <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const openBtn   = document.getElementById('open-new-resp');
+  const modalEl   = document.getElementById('inlineResponsabileModal');
+  const saveBtn   = document.getElementById('save-inline-resp');
+  const formEl    = document.getElementById('inline-resp-form');
+  const errBox    = document.getElementById('inline-resp-errors');
+  const respSelect = document.getElementById('{{ form.responsabile.id_for_label }}') || document.getElementById('{{ form.responsabile.auto_id }}');
+
+  // Utility: trova/crea istanza Bootstrap Modal
+  function getModalInstance() {
+    if (!modalEl) return null;
+    const M = window.bootstrap && window.bootstrap.Modal ? window.bootstrap.Modal : null;
+    return M ? (M.getInstance(modalEl) || new M(modalEl)) : null;
+  }
+
+  function showModal(){
+    const modal = getModalInstance();
+    if (modal) modal.show(); else modalEl.classList.add('show');
+  }
+
+  function hideModal(){
+    const modal = getModalInstance();
+    if (modal) modal.hide(); else modalEl.classList.remove('show');
+
+    // Fallback “hard” cleanup della backdrop e dello stato del body
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('padding-right');
+    document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+  }
+
+  function setSaving(saving) {
+    if (!saveBtn) return;
+    saveBtn.disabled = !!saving;
+    const spinner = saveBtn.querySelector('.spinner-border');
+    const label   = saveBtn.querySelector('.save-label');
+    if (spinner) spinner.classList.toggle('d-none', !saving);
+    if (label)   label.textContent = saving ? 'Salvataggio…' : 'Salva';
+  }
+
+  if (openBtn) openBtn.addEventListener('click', () => {
+    // pulizia errori
+    if (errBox) { errBox.classList.add('d-none'); errBox.innerHTML=''; }
+    showModal();
+  });
+
+  if (saveBtn && formEl) {
+    saveBtn.addEventListener('click', async () => {
+      setSaving(true);
+      if (errBox) { errBox.classList.add('d-none'); errBox.innerHTML=''; }
+
+      try {
+        const url = "{% url 'responsabile_create_inline' %}";
+        const fd = new FormData(formEl);
+        // CSRF
+        let csrf = fd.get('csrfmiddlewaretoken');
+        if (!csrf) {
+          const csrfInput = document.querySelector('input[name=csrfmiddlewaretoken]');
+          if (csrfInput) csrf = csrfInput.value;
+        }
+
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: csrf ? {'X-CSRFToken': csrf} : {},
+          body: fd
+        });
+
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) {
+          // Mostra errori
+          let html = '<strong>Correggi i seguenti errori:</strong><ul class="mb-0">';
+          if (data && data.errors) {
+            for (const [field, errs] of Object.entries(data.errors)) {
+              (errs || []).forEach(e => { html += `<li>${field}: ${e}</li>`; });
+            }
+          } else {
+            html += '<li>Errore sconosciuto</li>';
+          }
+          html += '</ul>';
+          if (errBox) {
+            errBox.innerHTML = html;
+            errBox.classList.remove('d-none');
+          }
+          setSaving(false);
+          return;
+        }
+
+        // Successo: aggiungi opzione al select Responsabile e selezionala
+        if (respSelect && data.id && data.label) {
+          const opt = new Option(data.label, String(data.id), true, true);
+          respSelect.add(opt);
+          respSelect.value = String(data.id);
+          // trigger change per eventuali plugin (es. select2)
+          const ev = new Event('change', { bubbles: true });
+          respSelect.dispatchEvent(ev);
+        }
+
+        // Chiudi modale in modo "pulito"
+        hideModal();
+
+        // Reset form del modale
+        formEl.reset();
+        if (errBox) { errBox.classList.add('d-none'); errBox.innerHTML=''; }
+      } catch (e) {
+        if (errBox) {
+          errBox.innerHTML = 'Si è verificato un errore di rete.';
+          errBox.classList.remove('d-none');
+        }
+      } finally {
+        setSaving(false);
+      }
+    });
+  }
+
+  // Ulteriore fallback: quando il modale viene nascosto, ripulisci backdrop se rimasta
+  if (modalEl) {
+    modalEl.addEventListener('hidden.bs.modal', () => {
+      document.body.classList.remove('modal-open');
+      document.body.style.removeProperty('padding-right');
+      document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+    });
+  }
+})();
+</script>
+{% endblock %}

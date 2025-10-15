@@ -1,0 +1,27 @@
+<div class="node">
+    <div class="node-header">
+        {{ struttura.codice }} - {{ struttura.nome }}
+    </div>
+    {% if struttura.responsabile_nome %}
+        <div class="node-details">
+            <strong>Responsabile:</strong> {{ struttura.responsabile_nome }} {{ struttura.responsabile_cognome }}
+        </div>
+        {% if struttura.qualifica %}
+            <div class="node-details">
+                <strong>Qualifica:</strong> {{ struttura.qualifica }}
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="node-details"><em>Nessun responsabile assegnato</em></div>
+    {% endif %}
+    {% if struttura.children %}
+        <button class="toggle-children">Mostra sottostrutture ⬇️</button>
+    {% endif %}
+    {% if struttura.children %}
+        <div class="children d-none">
+            {% for child in struttura.children %}
+                {% include "organigramma/struttura_tree.html" with struttura=child %}
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>

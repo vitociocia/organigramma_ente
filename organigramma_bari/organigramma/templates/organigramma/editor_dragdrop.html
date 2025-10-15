@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<style>
+    ul.organigramma {
+        list-style-type: none;
+        padding-left: 20px;
+    }
+    li.struttura-item {
+        background-color: #f0f0f0;
+        border: 1px solid #ccc;
+        margin-bottom: 5px;
+        padding: 10px;
+        cursor: grab;
+        border-radius: 6px;
+    }
+</style>
+{% endblock %}
+
+{% block container %}
+<div class="container mt-4">
+    <h2>Editor Interattivo dell'Organigramma</h2>
+    <p class="text-muted">Trascina gli elementi per modificare la gerarchia. Le modifiche vengono salvate automaticamente.</p>
+
+    <ul id="organigramma-root" class="organigramma"></ul>
+</div>
+
+<script>
+    function fetchOrganigramma() {
+        fetch("{% url 'get_strutture_json' %}")
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById("organigramma-root");
+                container.innerHTML = '';
+                renderTree(data, container);
+            });
+    }
+
+    function renderTree(nodes, parentEl) {
+        nodes.forEach(node => {
+            const li = document.createElement('li');
+            li.className = "struttura-item";
+            li.dataset.id = node.id;
+            li.innerHTML = `<strong>${node.codice}</strong> - ${node.nome}`;
+
+            const childrenUl = document.createElement('ul');
+            childrenUl.className = "organigramma";
+
+            if (node.children.length > 0) {
+                renderTree(node.children, childrenUl);
+            }
+
+            li.appendChild(childrenUl);
+            parentEl.appendChild(li);
+
+            new Sortable(childrenUl, {
+                group: 'strutture',
+                animation: 150,
+                onAdd: function (evt) {
+                    const movedId = evt.item.dataset.id;
+                    const newParentId = evt.to.closest('li')?.dataset.id || null;
+
+                    fetch("{% url 'update_padre' %}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}',
+                        },
+                        body: JSON.stringify({
+                            struttura_id: movedId,
+                            nuovo_padre_id: newParentId
+                        })
+                    }).then(resp => {
+                        if (resp.ok) {
+                            console.log("Aggiornato con successo.");
+                        } else {
+                            alert("Errore nel salvataggio.");
+                        }
+                    });
+                }
+            });
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', fetchOrganigramma);
+</script>
+{% endblock %}

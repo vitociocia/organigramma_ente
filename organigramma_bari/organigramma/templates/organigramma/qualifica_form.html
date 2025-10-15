@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block extra_head %}{% endblock extra_head %}
+{% block header_center_right_zone %}{% endblock header_center_right_zone %}
+{% block first_column %}{% endblock first_column %}
+{% block second_column %}{% endblock second_column %}
+{% block third_column %}{% endblock third_column %}
+{% block fourth_column %}{% endblock fourth_column %}
+{% block footer_contacts_section %}{% endblock footer_contacts_section %}
+
+{% block container %}
+<div class="container my-4">
+  <div class="col-md-8 offset-md-2">
+    <h2 class="text-center mb-4">
+      {% if qualifica %}Modifica Qualifica{% else %}Crea Nuova Qualifica{% endif %}
+    </h2>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      {% for field in form %}
+        <div class="mb-3">
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+          {% for error in field.errors %}
+            <div class="invalid-feedback d-block">{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Salva</button>
+        <a href="{% url 'qualifica_list' %}" class="btn btn-outline-secondary">Annulla</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
