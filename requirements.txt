@@ -1,0 +1,15 @@
+# --- Core framework (coerente con il tuo progetto) ---
+Django==3.2.18
+
+# --- Export Excel ---
+openpyxl==3.1.5
+
+# --- Application server per produzione (WSGI) ---
+gunicorn==21.2.0
+
+# --- Static files in produzione (opzionale, richiede configurazione in settings) ---
+whitenoise==6.6.0
+
+# --- Opzionali (decommenta SOLO se cambi DB) ---
+# psycopg2-binary==2.9.9    # PostgreSQL
+# mysqlclient==2.2.4         # MySQL/MariaDB (richiede librerie di sistema)
