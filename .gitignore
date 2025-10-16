@@ -27,3 +27,8 @@ staticfiles/
 .idea/
 .vscode/
 .DS_Store
+
+aggiorna_sorgenti.sh
+gunicorn_start
+restart.sh
+
