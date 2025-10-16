@@ -1,4 +1,4 @@
-asgiref==3.10.0
+asgiref==3.8.1
 design-django-theme==2.15.2
 Django==3.2.18
 django-sass-processor==1.4.2
